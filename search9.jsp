@@ -1,79 +1,63 @@
-<%@page import="org.apache.commons.lang3.StringEscapeUtils"%>
+<%@page import="com.thebodgeitstore.search.AdvancedSearch"%>
+<%@page import="java.util.Map"%>
+<%@page import="java.util.HashMap"%>
 <%@ page import="java.sql.*" %>
+<%@ page import="java.util.UUID" %>
+<%@page import="com.thebodgeitstore.util.AES"%>
 
 <%@ include file="/dbconnection.jspf" %>
-<jsp:include page="/header.jsp"/>
 
+<%!
+// stmt.execute("UPDATE Score SET status = 1 WHERE task = 'AES_SQLI'");    
+    
+//query = "\n\t<div class='search'>".concat(implode(params, "</div>\n\t<div class='search'>")).concat("</div>\n");
+%>
+<%
+    AdvancedSearch as = new AdvancedSearch(request, session, conn);
+    if(as.isAjax()){
+        response.setContentType("application/json");
+        out.print(as.getResultsOutput());
+        return; 
+    }
+%>
+<jsp:include page="/header.jsp"/>
+<SCRIPT>
+    var key = "<%= as.getEncryptKey() %>";
+    var debug = <%= as.isDebug() ? "true" : "false" %>;
+    loadfile('./js/jquery-1.6.4.min.js');
+    window.setTimeout(loadOthers, 10);
+    
+    function loadOthers(){
+        if (window.jQuery) {
+            loadfile('./js/encryption.js');
+            loadfile('./js/advanced2.js');
+            loadfile('./js/jquery-ui-1.85.js');
+            loadfile('./css/jquery-ui-1.85.css');
+        } else {
+            window.setTimeout(loadOthers, 10);
+        }
+    };
+</SCRIPT>
+    
 <h3>Search</h3>
 <font size="-1">
-<%
-String query = (String) request.getParameter("q");
-if (request.getMethod().equals("GET") && query != null){
-        if (query.replaceAll("\\s", "").toLowerCase().indexOf("<script>alert(\"xss\")</script>") >= 0) {
-                conn.createStatement().execute("UPDATE Score SET status = 1 WHERE task = 'SIMPLE_XSS'");
-        }
-    
-%>
-<b>You searched for:</b> <%= query %><br/><br/>
-<%    
-    Statement stmt = conn.createStatement();
-	ResultSet rs = null;
-        query = StringEscapeUtils.escapeHtml4(query).replaceAll("'", "&#39");
-	try {
-                String sql = "SELECT PRODUCT, DESC, TYPE, TYPEID, PRICE " +
-                             "FROM PRODUCTS AS a JOIN PRODUCTTYPES AS b " +
-                             "ON a.TYPEID = b.TYPEID " +
-                             "WHERE PRODUCT LIKE '%" + query + "%' OR " + 
-                             "DESC LIKE '%" + query + "%' OR PRICE LIKE '%" + query + "%' " +
-                             "OR TYPE LIKE '%" + query + "%'";
-                
-                if ("true".equals(request.getParameter("debug")))
-                    out.println(sql);
-		rs = stmt.executeQuery(sql);
-              
-                int count = 0;
-                String output = "";
-                while (rs.next()) {
-                    output = output.concat("<TR><TD>" + rs.getString("PRODUCT") + 
-                                  "</TD><TD>" + rs.getString("DESC") + 
-                                  "</TD><TD>" + rs.getString("TYPE") + 
-                                  "</TD><TD>" + rs.getString("PRICE") + "</TD></TR>\n");
-                    count++;
-                }
-                if(count > 0){
-%>
-<TABLE border="1">
-<TR><TD>Product</TD><TD>Description</TD><TD>Type</TD><TD>Price</TD></TR>
-<%= output %>
-</TABLE>                    
-<%              
-                } else {   
-                    out.println("<div><b>No Results Found</b></div>");
-                }
-        } catch (Exception e) {
-		if ("true".equals(request.getParameter("debug"))) {
-			stmt.execute("UPDATE Score SET status = 1 WHERE task = 'HIDDEN_DEBUG'");
-			out.println("DEBUG System error: " + e + "<br/><br/>");
-		} else {
-			out.println("System error.");
-		}
-	} finally {
-		if (rs != null) {
-			rs.close();
-		}
-		stmt.close();
-	}
-} else {
-%>
-<FORM name='query' method='GET'>
+<% if (as.isSearchRequest()){ %>
+<b>You searched for:</b> <%= as.getQueryString() %><br/><br/>
+    <%= as.getResultsOutput() %>
+    <a href="javascript:window.location=window.location.href">New Search</a>
+<% } else { %>
+<form id="advanced" name="advanced" method="POST" >
 <table>
-<tr><td>Search for</td><td><input type='text' name='q'></td></td>
-<tr><td></td><td><input type='submit' value='Search'/></td></td>
-<tr><td></td><td><a href='advanced.jsp' style='font-size:9pt;'>Advanced Search</a></td></td>
+<tr><td>Product:</td><td><input id='product' type='text' name='product' /></td></tr>
+<tr><td>Description:</td><td><input id='desc' type='text' name='desc' /></td></tr>
+<tr><td>Type:</td><td><input id='type' type='text' name='type' /></td></tr>
+<tr><td>Price:</td><td><input id='price' type='text' name='price' /></td></tr>
+<tr><td></td><td><input type='button' value='Search'/></td></tr>
 </table>
 </form>
-<%  
-}
-%>
+<%  } %>
 </font>
+<!-- Debug Output
+<%= (as.isDebug()) ? as.getDebugOutput() : "" %>
+-->
 <jsp:include page="/footer.jsp"/>
